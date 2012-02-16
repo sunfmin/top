@@ -30,6 +30,7 @@ type Request struct {
 	client *Client
 }
 
+
 func NewClient() *Client {
 	c := &Client{}
 	c.PartnerId = "top-sdk-go-20120214"
