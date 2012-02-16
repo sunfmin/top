@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"fmt"
 	"io/ioutil"
+	"strings"
 )
 
 type Client struct {
@@ -52,6 +53,14 @@ func (req *Request) Execute(result interface{}) error {
 	return error
 }
 
+func (req *Request) One(result interface{}) error {
+	return req.Execute(result)
+}
+
+func (req *Request) All(result interface{}) error {
+	return req.Execute(result)
+}
+
 
 func (req *Request) Param(name string, value string) {
 	req.Params[name] = value
@@ -88,6 +97,17 @@ func (req *Request) SignatureAndQueryString() (sign string, qs string) {
 	return
 }
 
+func (req *Request) Fields(fields ...string) {
+	req.Params["fields"] = strings.Join(fields, ",")
+}
+
+func (req *Request) NumIids(ids ...string) {
+	req.Params["num_iids"] = strings.Join(ids, ",")
+}
+
+func (req *Request) Nicks(nicks ...string) {
+	req.Params["nicks"] = strings.Join(nicks, ",")
+}
 
 func (req *Request) makeRequestParams() map[string]string {
 	ps := map[string]string{}
