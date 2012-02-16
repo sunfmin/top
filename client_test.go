@@ -14,15 +14,26 @@ func newRequest(name string) *Request {
 	return req
 }
 
+func taobaokeItems() []map[string]interface{} {
+	req := newRequest("taobao.taobaoke.items.get")
+	req.Param("fields", "num_iid,title,nick,pic_url,price,click_url,commission,commission_rate,commission_num,commission_volume,shop_click_url,seller_credit_score,item_location,volume")
+	req.Param("keyword", "nike")
+	req.Param("nick", "qintb8")
+	req.Param("page_size", "5")
+
+	r, _, _ := req.All()
+	return r
+}
+
 func TestNewClient(t *testing.T) {
+	items := taobaokeItems()
+
 	req := newRequest("taobao.taobaoke.items.convert")
 	req.Param("nick", "孙凤民")
-	req.NumIids("14009743597")
+	req.NumIids(items[2]["num_iid"])
 	req.Param("fields", "click_url,num_iid,commission,commission_rate,commission_num,commission_volume")
 
-	var result map[string]interface{}
-
-	req.Execute(&result)
+	result, _ := req.One()
 
 	t.Errorf("%+v", result)
 
@@ -32,8 +43,7 @@ func TestTaobaoUsersGet(t *testing.T) {
 	req := newRequest("taobao.users.get")
 	req.Nicks("孙凤民")
 	req.Fields("user_id", "nick", "location.city")
-	var result map[string]interface{}
-	req.One(&result)
+	result, _ := req.One()
 	t.Errorf("%+v", result)
 }
 
@@ -41,20 +51,11 @@ func TestTaobaoUserGet(t *testing.T) {
 	req := newRequest("taobao.user.get")
 	req.Param("nick", "孙凤民")
 	req.Fields("user_id", "nick", "location.city")
-	var result map[string]interface{}
-	req.One(&result)
+	result, _ := req.One()
+
 	t.Errorf("%+v", result)
 }
 
-func TestTaobaoTaobaokeItemsGet(t *testing.T) {
-	req := newRequest("taobao.taobaoke.items.get")
-	req.Param("fields", "num_iid,title,nick,pic_url,price,click_url,commission,commission_rate,commission_num,commission_volume,shop_click_url,seller_credit_score,item_location,volume")
-	req.Param("keyword", "nike")
-	req.Param("nick", "qintb8")
-	var result map[string]interface{}
-	req.All(&result)
-	t.Errorf("%+v", result)
-}
 
 
 func TestSignature(t *testing.T) {

@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"strconv"
+	"reflect"
 )
 
 type Client struct {
@@ -44,22 +46,34 @@ func (client *Client) NewRequest(name string) *Request {
 	return &Request{Name: name, Params: map[string]string{}, client: client}
 }
 
-func (req *Request) Execute(result interface{}) error {
+func (req *Request) Execute() (r []map[string]interface{}, count int64, err error) {
 	_, query := req.SignatureAndQueryString()
-	resp, error := http.Get("http://gw.api.taobao.com/router/rest?" + query)
+
+	url := "http://gw.api.taobao.com/router/rest?" + query
+	fmt.Printf("Requesting: %+v\n\n", url)
+
+	resp, err := http.Get(url)
 	defer resp.Body.Close()
 	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println(string(body))
-	json.Unmarshal(body, result)
-	return error
+/*	fmt.Println(string(body))*/
+	var result interface{}
+	json.Unmarshal(body, &result)
+	tm := &taobaoMap{result, 1}
+	unwrapped := tm.unwrap()
+	count = tm.count
+	r = unwrapped.result()
+	return
 }
 
-func (req *Request) One(result interface{}) error {
-	return req.Execute(result)
+func (req *Request) One() (r map[string]interface{}, err error) {
+	res, _, err := req.Execute()
+	r = res[0]
+	return
 }
 
-func (req *Request) All(result interface{}) error {
-	return req.Execute(result)
+func (req *Request) All() (r []map[string]interface{}, count int64, err error) {
+	r, count, err = req.Execute()
+	return
 }
 
 
@@ -102,8 +116,19 @@ func (req *Request) Fields(fields ...string) {
 	req.Params["fields"] = strings.Join(fields, ",")
 }
 
-func (req *Request) NumIids(ids ...string) {
-	req.Params["num_iids"] = strings.Join(ids, ",")
+func (req *Request) NumIids(ids ...interface{}) {
+	var strIds []string
+	for _, v := range(ids) {
+		switch newval := v.(type) {
+		case float64:
+			strIds = append(strIds, strconv.FormatFloat(newval, 'f', 0, 64))
+		case string:
+			strIds = append(strIds, newval)
+		default:
+			panic(fmt.Sprintf("type not allowed %+v", reflect.TypeOf(v)))
+		}
+	}
+	req.Params["num_iids"] = strings.Join(strIds, ",")
 }
 
 func (req *Request) Nicks(nicks ...string) {
