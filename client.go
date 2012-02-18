@@ -11,8 +11,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
-	"strconv"
-	"reflect"
+	"log"
 )
 
 type Client struct {
@@ -32,6 +31,24 @@ type Request struct {
 	client *Client
 }
 
+type Error struct {
+	Code string
+	Message string
+	SubCode string
+	SubMessage string
+}
+
+func (err *Error) Error() string {
+	if len(err.SubMessage) > 0 {
+		return err.Message + ": " + err.SubMessage
+	}
+	return err.Message
+}
+
+func NewError(code string, message string, subCode string, subMessage string) *Error {
+	return &Error{code, message, subCode, subMessage}
+}
+
 
 func NewClient() *Client {
 	c := &Client{}
@@ -46,32 +63,45 @@ func (client *Client) NewRequest(name string) *Request {
 	return &Request{Name: name, Params: map[string]string{}, client: client}
 }
 
-func (req *Request) Execute() (r []map[string]interface{}, count int64, err error) {
+func (req *Request) Execute() (r []Map, count int64, err error) {
 	_, query := req.SignatureAndQueryString()
 
 	url := "http://gw.api.taobao.com/router/rest?" + query
-	fmt.Printf("Requesting: %+v\n\n", url)
+	log.Printf("Requesting: %+v\n\n", url)
 
 	resp, err := http.Get(url)
 	defer resp.Body.Close()
 	body, _ := ioutil.ReadAll(resp.Body)
-/*	fmt.Println(string(body))*/
-	var result interface{}
+
+	//log.Println(string(body))
+
+	var result map[string]interface{}
 	json.Unmarshal(body, &result)
+
 	tm := &taobaoMap{result, 1}
+	cer := tm.result()
+
+	errMap := cer[0].ValueAsMap("error_response")
+	if errMap != nil {
+		return nil, 0, NewError(errMap.ValueAsString("code"), errMap.ValueAsString("msg"), errMap.ValueAsString("sub_code"), errMap.ValueAsString("sub_msg"))
+	}
+
 	unwrapped := tm.unwrap()
-	count = tm.count
 	r = unwrapped.result()
+	count = tm.count
 	return
 }
 
-func (req *Request) One() (r map[string]interface{}, err error) {
+func (req *Request) One() (r Map, err error) {
 	res, _, err := req.Execute()
+	if err != nil {
+		return nil, err
+	}
 	r = res[0]
 	return
 }
 
-func (req *Request) All() (r []map[string]interface{}, count int64, err error) {
+func (req *Request) All() (r []Map, count int64, err error) {
 	r, count, err = req.Execute()
 	return
 }
@@ -116,19 +146,8 @@ func (req *Request) Fields(fields ...string) {
 	req.Params["fields"] = strings.Join(fields, ",")
 }
 
-func (req *Request) NumIids(ids ...interface{}) {
-	var strIds []string
-	for _, v := range(ids) {
-		switch newval := v.(type) {
-		case float64:
-			strIds = append(strIds, strconv.FormatFloat(newval, 'f', 0, 64))
-		case string:
-			strIds = append(strIds, newval)
-		default:
-			panic(fmt.Sprintf("type not allowed %+v", reflect.TypeOf(v)))
-		}
-	}
-	req.Params["num_iids"] = strings.Join(strIds, ",")
+func (req *Request) NumIids(ids ...string) {
+	req.Params["num_iids"] = strings.Join(ids, ",")
 }
 
 func (req *Request) Nicks(nicks ...string) {

@@ -3,19 +3,52 @@ package top
 import(
 	"fmt"
 	"reflect"
+	"strconv"
 )
+
+type Map map[string]interface{}
+
+func (m Map) ValueAsString(key string) string {
+	switch v := m[key].(type) {
+	case nil:
+		return ""
+	case string:
+		return v
+	case float64:
+		return strconv.FormatFloat(v, 'f', 0, 64)
+	default:
+		panic(fmt.Sprintf("type can not conver to string %+v", reflect.TypeOf(v)))
+	}
+	return ""
+}
+
+func (m Map) ValueAsMap(key string) Map {
+	switch v := m[key].(type) {
+	case nil:
+		return nil
+	case map[string]interface{}:
+		return Map(v)
+	default:
+		panic(fmt.Sprintf("type can not conver to map[string]interface{} %+v", reflect.TypeOf(v)))
+	}
+	return nil
+}
 
 type taobaoMap struct {
 	val interface{}
 	count int64
 }
 
-func (m *taobaoMap) result() (r []map[string]interface{}) {
+func (m *taobaoMap) result() (r []Map) {
 	switch v := m.val.(type) {
 	case map[string]interface{}:
-		return []map[string]interface{}{v}
+		return []Map{Map(v)}
 	case []map[string]interface{}:
-		return v
+		var mapArr []Map
+		for _, av := range(v) {
+			mapArr = append(mapArr, Map(av))
+		}
+		return mapArr
 	default:
 		panic(fmt.Sprintf("type not allowed %+v", reflect.TypeOf(m.val)))
 	}
