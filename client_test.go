@@ -34,16 +34,16 @@ func TestErrorHandlingInvalidSignature(t *testing.T) {
 	req.Fields("user_id", "nick", "location.city")
 	_, err := req.One()
 	if err.Error() != "Invalid signature" {
-		t.Errorf("Error correctly set %+v", err)
+		t.Errorf("Error not correctly set %+v", err)
 	}
 }
 
 func TestErrorHandlingErrorCode(t *testing.T) {
 	req := newRequest("taobao.items.search")
 	_, _, err := req.All()
-	topErr, _ := err.(*Error)
+	topErr, isTopErr := err.(*Error)
 
-	if topErr.Code != "40" {
+	if isTopErr && topErr.Code != "40" {
 		t.Errorf("Wrong return err %+v", topErr)
 	}
 }
@@ -52,9 +52,9 @@ func TestErrorHandlingSubCode(t *testing.T) {
 	req := newRequest("taobao.items.search")
 	req.Fields("num_iid", "title", "price")
 	_, _, err := req.All()
-	topErr, _ := err.(*Error)
+	topErr, isTopErr := err.(*Error)
 
-	if topErr.SubCode != "isv.missing-parameter:search-none" {
+	if isTopErr && topErr.SubCode != "isv.missing-parameter:search-none" {
 		t.Errorf("Wrong return err %+v", topErr)
 	}
 }
@@ -68,10 +68,10 @@ func TestItemsSearch(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error returned %+v", err)
 	}
-	if r["item_categories"] == nil {
+	if r != nil && r["item_categories"] == nil {
 		t.Errorf("didn't return categories %+v", r)
 	}
-	if r["items"] == nil {
+	if r != nil && r["items"] == nil {
 		t.Errorf("didn't return items %+v", r)
 	}
 }

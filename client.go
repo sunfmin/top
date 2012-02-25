@@ -70,7 +70,12 @@ func (req *Request) Execute() (r []Map, count int64, err error) {
 	log.Printf("Requesting: %+v\n\n", url)
 
 	resp, err := http.Get(url)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	defer resp.Body.Close()
+
 	body, _ := ioutil.ReadAll(resp.Body)
 
 	//log.Println(string(body))
