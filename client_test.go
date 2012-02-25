@@ -113,6 +113,25 @@ func TestTaobaoUserGet(t *testing.T) {
 	}
 }
 
+func TestRequestNewSessionKey(t *testing.T) {
+	client := NewClient()
+	key, err := client.RequestNewSessionKey("invalid")
+	if err == nil {
+		t.Errorf("auth code should be invalid: %+v", key)
+	}
+}
+
+func TestSessionKeyRequest(t *testing.T) {
+	req := newRequest("taobao.taobaoke.report.get")
+	req.Client.SessionKey = "invalid"
+
+	req.Param("date", "20120102")
+	req.Param("fields", "trade_id,pay_time,pay_price,num_iid,outer_code,commission_rate,commission,seller_nick,pay_time,app_key")
+	result, _, err := req.All()
+	if err == nil {
+		t.Errorf("session should be invalid: %+v", result)
+	}
+}
 
 
 func TestSignature(t *testing.T) {

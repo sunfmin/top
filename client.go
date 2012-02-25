@@ -12,11 +12,14 @@ import (
 	"io/ioutil"
 	"strings"
 	"log"
+	"errors"
 )
 
 type Client struct {
 	AppKey string
 	SecretKey string
+	SessionKey string
+
 	PartnerId string
 
 	signMethod string
@@ -28,7 +31,7 @@ type Request struct {
 	Name string
 	Params map[string]string
 
-	client *Client
+	Client *Client
 }
 
 type Error struct {
@@ -60,7 +63,42 @@ func NewClient() *Client {
 }
 
 func (client *Client) NewRequest(name string) *Request {
-	return &Request{Name: name, Params: map[string]string{}, client: client}
+	return &Request{Name: name, Params: map[string]string{}, Client: client}
+}
+
+func (client *Client) RequestNewSessionKey(authcode string) (sessKey string, err error) {
+	hc := &http.Client{
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			sessKey = req.URL.Query().Get("top_session")
+			return errors.New("found")
+	}}
+
+	r, err := hc.Get(fmt.Sprintf("http://container.open.taobao.com/container?authcode=%s&encode=utf-8", authcode))
+
+	if sessKey != "" {
+		return sessKey, nil
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	bodyBytes, err := ioutil.ReadAll(r.Body)
+
+	if err != nil {
+		return "", err
+	}
+
+	vals, err := url.ParseQuery(string(bodyBytes))
+	if err != nil {
+		return "", err
+	}
+
+	if vals.Get("error") != "" {
+		return "", NewError(vals.Get("error"), vals.Get("error_description"), "", "")
+	}
+
+	return "", errors.New("no session key")
 }
 
 func (req *Request) Execute() (r []Map, count int64, err error) {
@@ -132,7 +170,7 @@ func (req *Request) SignatureAndQueryString() (sign string, qs string) {
 		keyvalues = keyvalues + k + ps[k]
 	}
 
-    beforeMd5 := req.client.SecretKey + keyvalues + req.client.SecretKey
+    beforeMd5 := req.Client.SecretKey + keyvalues + req.Client.SecretKey
 
 	c := md5.New()
 	io.WriteString(c, beforeMd5)
@@ -161,12 +199,15 @@ func (req *Request) Nicks(nicks ...string) {
 
 func (req *Request) makeRequestParams() map[string]string {
 	ps := map[string]string{}
-	ps["v"] = req.client.v
-	ps["sign_method"] = req.client.signMethod
-	ps["app_key"] = req.client.AppKey
-	ps["partner_id"] = req.client.PartnerId
+	ps["v"] = req.Client.v
+	ps["sign_method"] = req.Client.signMethod
+	ps["app_key"] = req.Client.AppKey
+	if req.Client.SessionKey != "" {
+		ps["session"] = req.Client.SessionKey
+	}
+	ps["partner_id"] = req.Client.PartnerId
 	ps["method"] = req.Name
-	ps["format"] = req.client.format
+	ps["format"] = req.Client.format
 	ps["timestamp"] = time.Now().Format("2006-01-02 15:04:05")
 
 	for k, v := range(req.Params) {
