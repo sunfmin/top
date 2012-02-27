@@ -133,7 +133,6 @@ func TestSessionKeyRequest(t *testing.T) {
 	}
 }
 
-
 func TestSignature(t *testing.T) {
 
 	client := NewClient()

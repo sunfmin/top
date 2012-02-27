@@ -1,6 +1,6 @@
 package top
 
-import(
+import (
 	"fmt"
 	"reflect"
 	"strconv"
@@ -35,7 +35,7 @@ func (m Map) ValueAsMap(key string) Map {
 }
 
 type taobaoMap struct {
-	val interface{}
+	val   interface{}
 	count int64
 }
 
@@ -45,7 +45,7 @@ func (m *taobaoMap) result() (r []Map) {
 		return []Map{Map(v)}
 	case []map[string]interface{}:
 		var mapArr []Map
-		for _, av := range(v) {
+		for _, av := range v {
 			mapArr = append(mapArr, Map(av))
 		}
 		return mapArr
@@ -84,7 +84,7 @@ func (m *taobaoMap) unwrap() *taobaoMap {
 	}
 
 	if len(convertedMap) == 1 {
-		for _, valObj := range(convertedMap) {
+		for _, valObj := range convertedMap {
 
 			v, ok := valObj.(map[string]interface{})
 			if ok {
@@ -97,7 +97,7 @@ func (m *taobaoMap) unwrap() *taobaoMap {
 
 			if arrOk {
 				var newMapArray []map[string]interface{}
-				for _, v := range(arrV) {
+				for _, v := range arrV {
 					newMapValue, mapValueOk := v.(map[string]interface{})
 					if mapValueOk {
 						newMapArray = append(newMapArray, newMapValue)

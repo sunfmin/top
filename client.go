@@ -1,43 +1,43 @@
 package top
 
 import (
-	"encoding/json"
-	"time"
-	"sort"
 	"crypto/md5"
-	"io"
-	"net/url"
-	"net/http"
-	"fmt"
-	"io/ioutil"
-	"strings"
-	"log"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"net/url"
+	"sort"
+	"strings"
+	"time"
 )
 
 type Client struct {
-	AppKey string
-	SecretKey string
+	AppKey     string
+	SecretKey  string
 	SessionKey string
 
 	PartnerId string
 
 	signMethod string
-	format  string
-	v string
+	format     string
+	v          string
 }
 
 type Request struct {
-	Name string
+	Name   string
 	Params map[string]string
 
 	Client *Client
 }
 
 type Error struct {
-	Code string
-	Message string
-	SubCode string
+	Code       string
+	Message    string
+	SubCode    string
 	SubMessage string
 }
 
@@ -51,7 +51,6 @@ func (err *Error) Error() string {
 func NewError(code string, message string, subCode string, subMessage string) *Error {
 	return &Error{code, message, subCode, subMessage}
 }
-
 
 func NewClient() *Client {
 	c := &Client{}
@@ -71,7 +70,7 @@ func (client *Client) RequestNewSessionKey(authcode string) (sessKey string, err
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 			sessKey = req.URL.Query().Get("top_session")
 			return errors.New("found")
-	}}
+		}}
 
 	r, err := hc.Get(fmt.Sprintf("http://container.open.taobao.com/container?authcode=%s&encode=utf-8", authcode))
 
@@ -149,7 +148,6 @@ func (req *Request) All() (r []Map, count int64, err error) {
 	return
 }
 
-
 func (req *Request) Param(name string, value string) {
 	req.Params[name] = value
 }
@@ -159,18 +157,18 @@ func (req *Request) SignatureAndQueryString() (sign string, qs string) {
 
 	var keys []string
 
-	for k, _ := range(ps) {
+	for k, _ := range ps {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 
-	keyvalues := "";
+	keyvalues := ""
 
-	for _, k := range(keys) {
+	for _, k := range keys {
 		keyvalues = keyvalues + k + ps[k]
 	}
 
-    beforeMd5 := req.Client.SecretKey + keyvalues + req.Client.SecretKey
+	beforeMd5 := req.Client.SecretKey + keyvalues + req.Client.SecretKey
 
 	c := md5.New()
 	io.WriteString(c, beforeMd5)
@@ -178,7 +176,7 @@ func (req *Request) SignatureAndQueryString() (sign string, qs string) {
 
 	values := &url.Values{}
 	values.Add("sign", sign)
-	for _, k := range(keys) {
+	for _, k := range keys {
 		values.Add(k, ps[k])
 	}
 	qs = values.Encode()
@@ -210,9 +208,8 @@ func (req *Request) makeRequestParams() map[string]string {
 	ps["format"] = req.Client.format
 	ps["timestamp"] = time.Now().Format("2006-01-02 15:04:05")
 
-	for k, v := range(req.Params) {
+	for k, v := range req.Params {
 		ps[k] = v
 	}
 	return ps
 }
-
