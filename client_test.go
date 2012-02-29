@@ -1,6 +1,7 @@
 package top
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -14,14 +15,15 @@ func newRequest(name string) *Request {
 	return req
 }
 
-func taobaokeItems() []Map {
+func taobaokeItems() []*Item {
 	req := newRequest("taobao.taobaoke.items.get")
 	req.Param("fields", "num_iid,title,nick,pic_url,price,click_url,commission,commission_rate,commission_num,commission_volume,shop_click_url,seller_credit_score,item_location,volume")
 	req.Param("keyword", "nike")
 	req.Param("nick", "qintb8")
 	req.Param("page_size", "5")
 
-	r, _, _ := req.All()
+	r := []*Item{}
+	req.Execute(&r)
 	return r
 }
 
@@ -32,7 +34,7 @@ func TestErrorHandlingInvalidSignature(t *testing.T) {
 	req := client.NewRequest("taobao.users.get")
 	req.Nicks("孙凤民")
 	req.Fields("user_id", "nick", "location.city")
-	_, err := req.One()
+	_, err := req.Execute(nil)
 	if err.Error() != "Invalid signature" {
 		t.Errorf("Error not correctly set %+v", err)
 	}
@@ -40,10 +42,10 @@ func TestErrorHandlingInvalidSignature(t *testing.T) {
 
 func TestErrorHandlingErrorCode(t *testing.T) {
 	req := newRequest("taobao.items.search")
-	_, _, err := req.All()
+	_, err := req.Execute(nil)
 	topErr, isTopErr := err.(*Error)
 
-	if isTopErr && topErr.Code != "40" {
+	if isTopErr && topErr.Code != 40 {
 		t.Errorf("Wrong return err %+v", topErr)
 	}
 }
@@ -51,7 +53,7 @@ func TestErrorHandlingErrorCode(t *testing.T) {
 func TestErrorHandlingSubCode(t *testing.T) {
 	req := newRequest("taobao.items.search")
 	req.Fields("num_iid", "title", "price")
-	_, _, err := req.All()
+	_, err := req.Execute(nil)
 	topErr, isTopErr := err.(*Error)
 
 	if isTopErr && topErr.SubCode != "isv.missing-parameter:search-none" {
@@ -59,20 +61,43 @@ func TestErrorHandlingSubCode(t *testing.T) {
 	}
 }
 
+type Item struct {
+	Num_iid int64
+	Title   string
+	Price   string
+}
+type Category struct {
+	Category_id int64
+	Count       int64
+}
+
+type Item_categories struct {
+	Item_categorie *[]Category
+}
+
+type Items struct {
+	Item *[]Item
+}
+
+type ItemSearchResult struct {
+	Item_categories Item_categories
+	Items           Items
+}
+
 func TestItemsSearch(t *testing.T) {
 	req := newRequest("taobao.items.search")
 	req.Fields("num_iid", "title", "price")
 	req.Param("q", "格子衬衫")
-	r, err := req.One()
+
+	r := &ItemSearchResult{}
+	_, err := req.Execute(r)
 
 	if err != nil {
 		t.Errorf("Error returned %+v", err)
 	}
-	if r != nil && r["item_categories"] == nil {
-		t.Errorf("didn't return categories %+v", r)
-	}
-	if r != nil && r["items"] == nil {
-		t.Errorf("didn't return items %+v", r)
+
+	if r != nil && r.Items.Item == nil {
+		t.Errorf("didn't return items %+v", r.Items.Item)
 	}
 }
 
@@ -80,25 +105,35 @@ func TestNewClient(t *testing.T) {
 	items := taobaokeItems()
 
 	req := newRequest("taobao.taobaoke.items.convert")
-	req.Param("nick", "孙凤民")
-	req.NumIids(items[2].ValueAsString("num_iid"))
+	req.Param("nick", "qintb8")
+	req.NumIids(items[2].Num_iid)
 	req.Param("fields", "click_url,num_iid,commission,commission_rate,commission_num,commission_volume")
 
-	result, _ := req.One()
+	newItems := []*Item{}
+	req.Execute(&newItems)
 
-	if result["num_iid"] == nil {
-		t.Errorf("result are empty %+v", result)
+	if items[0].Num_iid == 0 {
+		t.Errorf("result are empty %+v", newItems)
 	}
 
+}
+
+type User struct {
+	User_id int64
+	Nick    string
 }
 
 func TestTaobaoUsersGet(t *testing.T) {
 	req := newRequest("taobao.users.get")
 	req.Nicks("孙凤民")
 	req.Fields("user_id", "nick", "location.city")
-	result, _ := req.One()
-	if result["user_id"] == nil {
-		t.Errorf("user are empty %+v", result)
+	us := []*User{}
+	req.Execute(&us)
+	if len(us) == 0 {
+		t.Errorf("user are empty %+v", us)
+	}
+	if us[0].Nick != "孙凤民" {
+		t.Errorf("user are wrong %+v", us)
 	}
 }
 
@@ -106,10 +141,15 @@ func TestTaobaoUserGet(t *testing.T) {
 	req := newRequest("taobao.user.get")
 	req.Param("nick", "孙凤民")
 	req.Fields("user_id", "nick", "location.city")
-	result, _ := req.One()
+	u := &User{}
+	req.Execute(u)
 
-	if result["user_id"] == nil {
-		t.Errorf("%+v", result)
+	if u.Nick != "孙凤民" {
+		t.Errorf("%+v", u)
+	}
+
+	if u.User_id == 0 {
+		t.Errorf("%+v", u)
 	}
 }
 
@@ -127,9 +167,9 @@ func TestSessionKeyRequest(t *testing.T) {
 
 	req.Param("date", "20120102")
 	req.Param("fields", "trade_id,pay_time,pay_price,num_iid,outer_code,commission_rate,commission,seller_nick,pay_time,app_key")
-	result, _, err := req.All()
+	_, err := req.Execute(nil)
 	if err == nil {
-		t.Errorf("session should be invalid: %+v", result)
+		t.Errorf("session should be invalid")
 	}
 }
 
@@ -151,4 +191,44 @@ func TestSignature(t *testing.T) {
 		t.Errorf("Wrong signature %s", sign)
 	}
 
+}
+
+var unwrapjsonTests = []struct {
+	jsonIn  string
+	jsonOut string
+	err     *Error
+	count   int64
+}{
+	{`{"error_response":{"code":40,"msg":"Missing required arguments:nicks"}}`, "", &Error{40, "Missing required arguments:nicks", "", ""}, 0},
+	{`{"response":{ "data": [{ "name": "Felix"}, {"name": "Juice"}], "total_results": 2}}`, `[{ "name": "Felix"}, {"name": "Juice"}]`, nil, 2},
+	{`{"response":{ "data":   { "name": "Felix", "gender": "Man"}}}`, `{ "name": "Felix", "gender": "Man"}`, nil, 1},
+	{`{"taobaoke_items_convert_response":{"taobaoke_items":{"taobaoke_item":[{"click_url":"http://s.click.taobao.com/t_8?e=7HZ6jHSTbIQ1Foq6TZKhbPgDOyt1AzILzvAKsVn%2B8AHubbgZmH6ogOs4aK0SlekAExSG1t9VJD3Ki0Gl7hB5WACvfhKaUqfLsduq80eGHYLvPdXowQ%3D%3D&p=mm_30129436_0_0&n=19","commission":"5.39","commission_num":"0","commission_rate":"150.00","commission_volume":"0.00","num_iid":14009743597}]},"total_results":1}}`,
+		`[{"click_url":"http://s.click.taobao.com/t_8?e=7HZ6jHSTbIQ1Foq6TZKhbPgDOyt1AzILzvAKsVn%2B8AHubbgZmH6ogOs4aK0SlekAExSG1t9VJD3Ki0Gl7hB5WACvfhKaUqfLsduq80eGHYLvPdXowQ%3D%3D&p=mm_30129436_0_0&n=19","commission":"5.39","commission_num":"0","commission_rate":"150.00","commission_volume":"0.00","num_iid":14009743597}]`,
+		nil,
+		1,
+	},
+}
+
+func TestUnwrapjson(t *testing.T) {
+	for _, tt := range unwrapjsonTests {
+		cleanjson, count, err := unwrapjson([]byte(tt.jsonIn))
+
+		stringcleanjson := string(cleanjson)
+
+		if stringcleanjson != tt.jsonOut {
+			t.Errorf("expected result is %+v, but was %+v", tt.jsonOut, stringcleanjson)
+		}
+
+		if count != tt.count {
+			t.Errorf("expected count is %+v, but was %+v", tt.count, count)
+		}
+
+		if tt.err != nil && !reflect.DeepEqual(err, tt.err) {
+			t.Errorf("expected err is %+v, but was %+v", tt.err, err)
+		}
+		if tt.err == nil && err != nil {
+			t.Errorf("expected no err, but has %+v", err)
+		}
+
+	}
 }

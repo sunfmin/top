@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -35,10 +36,10 @@ type Request struct {
 }
 
 type Error struct {
-	Code       string
-	Message    string
-	SubCode    string
-	SubMessage string
+	Code       int64  `json:"code"`
+	Message    string `json:"msg"`
+	SubCode    string `json:"sub_code"`
+	SubMessage string `json:"sub_msg"`
 }
 
 func (err *Error) Error() string {
@@ -46,10 +47,6 @@ func (err *Error) Error() string {
 		return err.Message + ": " + err.SubMessage
 	}
 	return err.Message
-}
-
-func NewError(code string, message string, subCode string, subMessage string) *Error {
-	return &Error{code, message, subCode, subMessage}
 }
 
 func NewClient() *Client {
@@ -94,57 +91,88 @@ func (client *Client) RequestNewSessionKey(authcode string) (sessKey string, err
 	}
 
 	if vals.Get("error") != "" {
-		return "", NewError(vals.Get("error"), vals.Get("error_description"), "", "")
+		errorCode, _ := strconv.ParseInt(vals.Get("error"), 10, 64)
+		return "", &Error{errorCode, vals.Get("error_description"), "", ""}
 	}
 
 	return "", errors.New("no session key")
 }
 
-func (req *Request) Execute() (r []Map, count int64, err error) {
+func (req *Request) Execute(r interface{}) (count int64, err error) {
 	_, query := req.SignatureAndQueryString()
 
 	url := "http://gw.api.taobao.com/router/rest?" + query
 	log.Printf("Requesting: %+v\n\n", url)
 
+	count = 0
+
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, 0, err
+		return
 	}
-
 	defer resp.Body.Close()
 
-	body, _ := ioutil.ReadAll(resp.Body)
-
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
 	//log.Println(string(body))
 
-	var result map[string]interface{}
-	json.Unmarshal(body, &result)
+	cleanjson, count, err := unwrapjson(body)
 
-	tm := &taobaoMap{result, 1}
-	cer := tm.result()
-
-	errMap := cer[0].ValueAsMap("error_response")
-	if errMap != nil {
-		return nil, 0, NewError(errMap.ValueAsString("code"), errMap.ValueAsString("msg"), errMap.ValueAsString("sub_code"), errMap.ValueAsString("sub_msg"))
-	}
-
-	unwrapped := tm.unwrap()
-	r = unwrapped.result()
-	count = tm.count
-	return
-}
-
-func (req *Request) One() (r Map, err error) {
-	res, _, err := req.Execute()
 	if err != nil {
-		return nil, err
+		return
 	}
-	r = res[0]
+
+	err = json.Unmarshal(cleanjson, &r)
+	if err != nil {
+		return
+	}
+
 	return
 }
 
-func (req *Request) All() (r []Map, count int64, err error) {
-	r, count, err = req.Execute()
+func unwrapjson(data []byte) (cleanjson []byte, count int64, err error) {
+
+	valInLoop := data
+	count = 0
+	for {
+		var val map[string]json.RawMessage
+		json.Unmarshal(valInLoop, &val)
+
+		if len(val) == 0 {
+			cleanjson = valInLoop
+			break
+		}
+
+		countmsg, countExist := val["total_results"]
+		if countExist {
+			count, _ = strconv.ParseInt(string(countmsg), 10, 64)
+			delete(val, "total_results")
+		}
+
+		errmsg, errExist := val["error_response"]
+		if errExist {
+			var topError Error
+			json.Unmarshal(errmsg, &topError)
+			err = error(&topError)
+			break
+		}
+
+		if len(val) == 1 {
+			for _, rawJson := range val {
+				valInLoop = rawJson
+				break
+			}
+		}
+		if len(val) > 1 {
+			if count == 0 {
+				count = 1
+			}
+			cleanjson = valInLoop
+			break
+		}
+	}
 	return
 }
 
@@ -187,8 +215,12 @@ func (req *Request) Fields(fields ...string) {
 	req.Params["fields"] = strings.Join(fields, ",")
 }
 
-func (req *Request) NumIids(ids ...string) {
-	req.Params["num_iids"] = strings.Join(ids, ",")
+func (req *Request) NumIids(ids ...int64) {
+	var strids []string
+	for _, id := range ids {
+		strids = append(strids, strconv.FormatInt(id, 10))
+	}
+	req.Params["num_iids"] = strings.Join(strids, ",")
 }
 
 func (req *Request) Nicks(nicks ...string) {
