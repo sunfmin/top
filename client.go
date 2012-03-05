@@ -99,25 +99,8 @@ func (client *Client) RequestNewSessionKey(authcode string) (sessKey string, err
 }
 
 func (req *Request) Execute(r interface{}) (count int64, err error) {
-	_, query := req.SignatureAndQueryString()
-
-	url := "http://gw.api.taobao.com/router/rest?" + query
-	log.Printf("Requesting: %+v\n\n", url)
-
 	count = 0
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-	//log.Println(string(body))
-
+	body, err := req.doRequestAndGetBody()
 	cleanjson, count, err := unwrapjson(body)
 
 	if err != nil {
@@ -129,6 +112,69 @@ func (req *Request) Execute(r interface{}) (count int64, err error) {
 		return
 	}
 
+	return
+}
+
+func (req *Request) ExecuteIntoBranches(rmap map[string]interface{}) (count int64, err error) {
+	body, err := req.doRequestAndGetBody()
+	cleanjson, count, err := unwrapjson(body)
+
+	if err != nil {
+		return
+	}
+
+	err = unmashalIntoBranches(cleanjson, rmap)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (req *Request) doRequestAndGetBody() (body []byte, err error) {
+	_, query := req.SignatureAndQueryString()
+
+	url := "http://gw.api.taobao.com/router/rest?" + query
+	log.Printf("Requesting: %+v\n\n", url)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err = ioutil.ReadAll(resp.Body)
+	//log.Println(string(body))
+	return
+}
+
+func unmashalIntoBranches(data []byte, rmap map[string]interface{}) (err error) {
+	var unwraped map[string]json.RawMessage
+	json.Unmarshal(data, &unwraped)
+
+	noValueCount := 0
+
+	for name, rval := range rmap {
+		unwrapedBranchValue, haveVal := unwraped[name]
+		if !haveVal {
+			noValueCount++
+			continue
+		}
+
+		clean, _, err := unwrapjson(unwrapedBranchValue)
+		if err != nil {
+			return err
+		}
+
+		err = json.Unmarshal(clean, &rval)
+		if err != nil {
+			return err
+		}
+	}
+
+	if noValueCount == len(rmap) {
+		return errors.New("All keys of branches not exist in responsed json")
+	}
 	return
 }
 

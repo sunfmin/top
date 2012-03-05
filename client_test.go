@@ -2,6 +2,7 @@ package top
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 )
 
@@ -84,20 +85,75 @@ type ItemSearchResult struct {
 	Items           Items
 }
 
+func TestItemsSearchNotStudpidWay(t *testing.T) {
+	req := newRequest("taobao.items.search")
+	req.Fields("num_iid", "title", "price")
+	req.Param("q", "格子衬衫")
+
+	categories := []Category{}
+	items := []Item{}
+	_, err := req.ExecuteIntoBranches(map[string]interface{}{
+		"item_categories": &categories,
+		"items":           &items,
+	})
+
+	if err != nil {
+		t.Errorf("Error returned %+v", err)
+	}
+
+	if len(categories) == 0 {
+		t.Errorf("didn't return categories %+v", categories)
+	}
+
+	if len(items) == 0 {
+		t.Errorf("didn't return items %+v", items)
+	}
+}
+
+type ItemCat struct {
+	Cid        int64
+	Parent_cid int64
+	Name       string
+	Status     string
+	Sort_order int64
+}
+
+func TestItemsCatsGet(t *testing.T) {
+	req := newRequest("taobao.itemcats.get")
+	req.Fields("cid,parent_cid,name,is_parent")
+	req.Param("cids", "50011999")
+
+	lastModified := ""
+	itemCats := []ItemCat{}
+	_, err := req.ExecuteIntoBranches(map[string]interface{}{
+		"last_modified": &lastModified,
+		"item_cats":     &itemCats,
+	})
+
+	if err != nil {
+		_, err = req.Execute(&itemCats)
+	}
+
+	if err != nil {
+		t.Errorf("Error returned %+v", err)
+	}
+
+	if len(itemCats) == 0 {
+		t.Errorf("should got value but empty", itemCats)
+	}
+}
+
 func TestItemsSearch(t *testing.T) {
 	req := newRequest("taobao.items.search")
 	req.Fields("num_iid", "title", "price")
 	req.Param("q", "格子衬衫")
 
 	r := &ItemSearchResult{}
+
 	_, err := req.Execute(r)
 
 	if err != nil {
 		t.Errorf("Error returned %+v", err)
-	}
-
-	if r != nil && r.Items.Item == nil {
-		t.Errorf("didn't return items %+v", r.Items.Item)
 	}
 }
 
@@ -171,6 +227,41 @@ func TestSessionKeyRequest(t *testing.T) {
 	if err == nil {
 		t.Errorf("session should be invalid")
 	}
+}
+
+type TaobaoKeReportMember struct {
+	Trade_id  int64
+	Pay_price string
+	Num_iid   int64
+}
+
+type Trade struct {
+	Buyer_email     string
+	Buyer_alipay_no string
+	Buyer_nick      string
+}
+
+func TestTradeGet(t *testing.T) {
+	req := newRequest("taobao.taobaoke.report.get")
+	req.Client.SessionKey = "6100a16cfe79441673595a931b95b8b5288de4344cb7537322176867"
+	req.Param("date", "20120225")
+	req.Nicks("qintb8")
+	req.Fields("trade_id", "pay_price", "num_iid")
+
+	var r []*TaobaoKeReportMember
+	req.Execute(&r)
+
+	req2 := newRequest("taobao.trade.get")
+
+	req2.Client.SessionKey = "6100a16cfe79441673595a931b95b8b5288de4344cb7537322176867"
+	req2.Fields("buyer_email", "buyer_alipay_no", "buyer_nick")
+	req2.Param("tid", strconv.FormatInt(r[0].Trade_id, 10))
+	var trade Trade
+	_, err := req2.Execute(&trade)
+	if err == nil {
+		t.Errorf("expected err to be nil but: %+v", err)
+	}
+
 }
 
 func TestSignature(t *testing.T) {
