@@ -20,8 +20,8 @@ type Client struct {
 	AppKey     string
 	SecretKey  string
 	SessionKey string
-
-	PartnerId string
+	PartnerId  string
+	Verbose    bool
 
 	signMethod string
 	format     string
@@ -78,6 +78,7 @@ func (client *Client) RequestNewSessionKey(authcode string) (sessKey string, err
 	if err != nil {
 		return "", err
 	}
+	defer r.Body.Close()
 
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 
@@ -135,7 +136,9 @@ func (req *Request) doRequestAndGetBody() (body []byte, err error) {
 	_, query := req.SignatureAndQueryString()
 
 	url := "http://gw.api.taobao.com/router/rest?" + query
-	log.Printf("Requesting: %+v\n\n", url)
+	if req.Client.Verbose {
+		log.Printf("Requesting: %+v\n\n", url)
+	}
 
 	resp, err := http.Get(url)
 	if err != nil {
