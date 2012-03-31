@@ -110,6 +110,9 @@ func (req *Request) Execute(r interface{}) (count int64, err error) {
 
 	err = json.Unmarshal(cleanjson, &r)
 	if err != nil {
+		if req.Client.Verbose {
+			log.Printf("top: cannot unmarshal json: %+v\n", string(cleanjson))
+		}
 		return
 	}
 
@@ -126,6 +129,9 @@ func (req *Request) ExecuteIntoBranches(rmap map[string]interface{}) (count int6
 
 	err = unmashalIntoBranches(cleanjson, rmap)
 	if err != nil {
+		if req.Client.Verbose {
+			log.Printf("top: cannot unmarshal json: %+v\n", string(cleanjson))
+		}
 		return
 	}
 
@@ -137,7 +143,7 @@ func (req *Request) doRequestAndGetBody() (body []byte, err error) {
 
 	url := "http://gw.api.taobao.com/router/rest?" + query
 	if req.Client.Verbose {
-		log.Printf("Requesting: %+v\n\n", url)
+		log.Printf("top: requesting: %+v\n\n", url)
 	}
 
 	resp, err := http.Get(url)
