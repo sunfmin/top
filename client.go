@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,11 +36,23 @@ type Request struct {
 	Client *Client
 }
 
+var bansecondsRegexp = regexp.MustCompile(`This ban[^\d]*(\d+)[^\d]*seconds`)
+
 type Error struct {
 	Code       int64  `json:"code"`
 	Message    string `json:"msg"`
 	SubCode    string `json:"sub_code"`
 	SubMessage string `json:"sub_msg"`
+}
+
+func (err *Error) BanSeconds() (r int64) {
+	if err.Code != 7 {
+		return 0
+	}
+
+	rs := bansecondsRegexp.FindStringSubmatch(err.SubMessage)
+	r, _ = strconv.ParseInt(rs[1], 10, 64)
+	return
 }
 
 func (err *Error) Error() string {

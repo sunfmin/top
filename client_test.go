@@ -28,6 +28,18 @@ func taobaokeItems() []*Item {
 	return r
 }
 
+func TestBanSeconds(t *testing.T) {
+	err := &Error{
+		Code:       7,
+		Message:    "App Call Limited",
+		SubCode:    "accesscontrol.limited-by-app-access-count",
+		SubMessage: "This ban will last for 41 more seconds",
+	}
+	if err.BanSeconds() != 41 {
+		t.Errorf("ban seconds should be 41, but was %d", err.BanSeconds())
+	}
+}
+
 func TestErrorHandlingInvalidSignature(t *testing.T) {
 	client := NewClient()
 	client.AppKey = "12486123"
