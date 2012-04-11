@@ -1,6 +1,8 @@
 package top
 
 import (
+	"io/ioutil"
+	"os"
 	"reflect"
 	"strconv"
 	"testing"
@@ -184,6 +186,29 @@ func TestNewClient(t *testing.T) {
 		t.Errorf("result are empty %+v", newItems)
 	}
 
+}
+
+func TestUnmashalIntoBranches(t *testing.T) {
+	f, _ := os.Open("fixtures/branches.json")
+	defer f.Close()
+	b, _ := ioutil.ReadAll(f)
+	cleanjson, _, err := unwrapjson(b)
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+
+	items := []Item{}
+	rmap := map[string]interface{}{
+		"items": &items,
+	}
+	err = unmashalIntoBranches(cleanjson, rmap)
+
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+	if len(items) == 0 {
+		t.Errorf("length should > 0, %+v", items)
+	}
 }
 
 type User struct {

@@ -115,6 +115,9 @@ func (client *Client) RequestNewSessionKey(authcode string) (sessKey string, err
 func (req *Request) Execute(r interface{}) (count int64, err error) {
 	count = 0
 	body, err := req.doRequestAndGetBody()
+	if err != nil {
+		return
+	}
 	cleanjson, count, err := unwrapjson(body)
 
 	if err != nil {
@@ -124,7 +127,7 @@ func (req *Request) Execute(r interface{}) (count int64, err error) {
 	err = json.Unmarshal(cleanjson, &r)
 	if err != nil {
 		if req.Client.Verbose {
-			log.Printf("top: cannot unmarshal json: %+v\n", string(cleanjson))
+			log.Printf("top: cannot unmarshal json in top.Execute: %+v\n", string(cleanjson))
 		}
 		return
 	}
@@ -134,6 +137,10 @@ func (req *Request) Execute(r interface{}) (count int64, err error) {
 
 func (req *Request) ExecuteIntoBranches(rmap map[string]interface{}) (count int64, err error) {
 	body, err := req.doRequestAndGetBody()
+	if err != nil {
+		return
+	}
+
 	cleanjson, count, err := unwrapjson(body)
 
 	if err != nil {
@@ -143,7 +150,7 @@ func (req *Request) ExecuteIntoBranches(rmap map[string]interface{}) (count int6
 	err = unmashalIntoBranches(cleanjson, rmap)
 	if err != nil {
 		if req.Client.Verbose {
-			log.Printf("top: cannot unmarshal json: %+v\n", string(cleanjson))
+			log.Printf("top: cannot unmarshal json in top.ExecuteIntoBranches: %+v\n", err)
 		}
 		return
 	}
@@ -174,12 +181,12 @@ func unmashalIntoBranches(data []byte, rmap map[string]interface{}) (err error) 
 	var unwraped map[string]json.RawMessage
 	json.Unmarshal(data, &unwraped)
 
-	noValueCount := 0
+	noValueKeys := []string{}
 
 	for name, rval := range rmap {
 		unwrapedBranchValue, haveVal := unwraped[name]
 		if !haveVal {
-			noValueCount++
+			noValueKeys = append(noValueKeys, name)
 			continue
 		}
 
@@ -194,8 +201,8 @@ func unmashalIntoBranches(data []byte, rmap map[string]interface{}) (err error) 
 		}
 	}
 
-	if noValueCount == len(rmap) {
-		return errors.New("All keys of branches not exist in responsed json")
+	if len(noValueKeys) == len(rmap) {
+		return errors.New(fmt.Sprintf("All keys %+v of branches not exist in responsed json, %+v", noValueKeys, string(data)))
 	}
 	return
 }
