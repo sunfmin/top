@@ -226,6 +226,12 @@ func unwrapjson(data []byte) (cleanjson []byte, count int64, err error) {
 			delete(val, "total_results")
 		}
 
+		if len(val) == 0 {
+			cleanjson = []byte{}
+			err = errors.New("Unwrapped to blank")
+			break
+		}
+
 		errmsg, errExist := val["error_response"]
 		if errExist {
 			var topError Error

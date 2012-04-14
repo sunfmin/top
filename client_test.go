@@ -1,6 +1,7 @@
 package top
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -324,7 +325,7 @@ func TestSignature(t *testing.T) {
 var unwrapjsonTests = []struct {
 	jsonIn  string
 	jsonOut string
-	err     *Error
+	err     error
 	count   int64
 }{
 	{`{"error_response":{"code":40,"msg":"Missing required arguments:nicks"}}`, "", &Error{40, "Missing required arguments:nicks", "", ""}, 0},
@@ -335,6 +336,7 @@ var unwrapjsonTests = []struct {
 		nil,
 		1,
 	},
+	{`{"items_search_response":{"total_results":0}}`, ``, errors.New("Unwrapped to blank"), 0},
 }
 
 func TestUnwrapjson(t *testing.T) {
