@@ -159,13 +159,13 @@ func (req *Request) ExecuteIntoBranches(rmap map[string]interface{}) (count int6
 }
 
 func (req *Request) doRequestAndGetBody() (body []byte, err error) {
+	countOrSwitchOrWait(req.Client)
 	_, query := req.SignatureAndQueryString()
 
 	url := "http://gw.api.taobao.com/router/rest?" + query
 	if req.Client.Verbose {
 		log.Printf("top: requesting: %+v\n\n", url)
 	}
-
 	resp, err := http.Get(url)
 	if err != nil {
 		return
