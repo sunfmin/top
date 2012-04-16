@@ -32,6 +32,11 @@ func (kcc *appKeyCallCount) reachingLimit() bool {
 	return kcc.CurrentMinuteCalledCount >= kcc.CallTimesPerMinute-5
 }
 
+func (kcc *appKeyCallCount) updateClientKey(client *Client) {
+	client.AppKey = kcc.AppKey
+	client.SecretKey = kcc.SecretKey
+}
+
 func (kcc *appKeyCallCount) count() {
 	if time.Now().Sub(kcc.CurrentMinuteStart) > 1*time.Minute {
 		kcc.CurrentMinuteCalledCount = 0
@@ -61,6 +66,7 @@ func countOrSwitchOrWait(client *Client) {
 	if currentUsingAppKey == nil {
 		currentUsingAppKey = appKeyCallCountList[0]
 		currentUsingAppKey.CurrentMinuteStart = time.Now()
+		currentUsingAppKey.updateClientKey(client)
 	}
 	currentUsingAppKey.mutex.Lock()
 	defer currentUsingAppKey.mutex.Unlock()
@@ -68,6 +74,7 @@ func countOrSwitchOrWait(client *Client) {
 	if currentUsingAppKey.reachingLimit() {
 		sort.Sort(appKeyCallCountList)
 		currentUsingAppKey = appKeyCallCountList[0]
+		currentUsingAppKey.updateClientKey(client)
 	}
 
 	if currentUsingAppKey.reachingLimit() {
