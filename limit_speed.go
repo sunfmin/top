@@ -1,6 +1,7 @@
 package top
 
 import (
+	"errors"
 	"log"
 	"sort"
 	"sync"
@@ -47,7 +48,9 @@ func (kcc *appKeyCallCount) count() {
 }
 
 func (kcc *appKeyCallCount) waitNanoseconds() time.Duration {
-	return time.Duration(int64(1*time.Minute) - int64(time.Now().Sub(kcc.CurrentMinuteStart)))
+	distance := int64(time.Now().Sub(kcc.CurrentMinuteStart))
+	waitMinutes := distance / int64(time.Minute)
+	return time.Duration((waitMinutes+1)*int64(time.Minute) - distance)
 }
 
 func ExtandLimitByAddAppKey(appkey string, secretkey string, calltimesPerMinute int) {
@@ -56,6 +59,31 @@ func ExtandLimitByAddAppKey(appkey string, secretkey string, calltimesPerMinute 
 		SecretKey:          secretkey,
 		CallTimesPerMinute: calltimesPerMinute,
 	})
+}
+
+func detectBanned(err error) (rerr error) {
+	rerr = err
+	if len(appKeyCallCountList) <= 1 {
+		return
+	}
+	if currentUsingAppKey == nil {
+		return
+	}
+	topError, ok := err.(*Error)
+	if !ok {
+		return
+	}
+	if topError.BanSeconds() == 0 {
+		return
+	}
+	if Verbose {
+		log.Printf("settling ban for %+v", topError)
+	}
+
+	currentUsingAppKey.CurrentMinuteStart = time.Now().Add(time.Duration(topError.BanSeconds()) * time.Second)
+	currentUsingAppKey.CurrentMinuteCalledCount = currentUsingAppKey.CallTimesPerMinute
+	rerr = errors.New("ban settled.")
+	return
 }
 
 func countOrSwitchOrWait(client *Client) {
@@ -78,7 +106,7 @@ func countOrSwitchOrWait(client *Client) {
 	}
 
 	if currentUsingAppKey.reachingLimit() {
-		if client.Verbose {
+		if Verbose {
 			log.Printf("Reaching invoke count %d, will wait for %d seconds for not to be banned.",
 				currentUsingAppKey.CurrentMinuteCalledCount,
 				currentUsingAppKey.waitNanoseconds()/1e9)
