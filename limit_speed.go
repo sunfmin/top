@@ -22,7 +22,7 @@ type KeyCallCounts []*appKeyCallCount
 func (s KeyCallCounts) Len() int      { return len(s) }
 func (s KeyCallCounts) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s KeyCallCounts) Less(i, j int) bool {
-	return s[i].CurrentMinuteCalledCount > s[j].CurrentMinuteCalledCount
+	return s[i].CurrentMinuteCalledCount < s[j].CurrentMinuteCalledCount
 }
 
 var appKeyCallCountList KeyCallCounts
@@ -61,7 +61,7 @@ func ExtandLimitByAddAppKey(appkey string, secretkey string, calltimesPerMinute 
 	})
 }
 
-func detectBanned(err error) (rerr error) {
+func switchedKeyIfBanned(err error, client *Client) (rerr error, switched bool) {
 	rerr = err
 	if len(appKeyCallCountList) <= 1 {
 		return
@@ -83,10 +83,11 @@ func detectBanned(err error) (rerr error) {
 	currentUsingAppKey.CurrentMinuteStart = time.Now().Add(time.Duration(topError.BanSeconds()) * time.Second)
 	currentUsingAppKey.CurrentMinuteCalledCount = currentUsingAppKey.CallTimesPerMinute
 	rerr = errors.New("ban settled.")
+	switched = countOrSwitchOrWait(client)
 	return
 }
 
-func countOrSwitchOrWait(client *Client) {
+func countOrSwitchOrWait(client *Client) (switched bool) {
 	if len(appKeyCallCountList) == 0 {
 		return
 	}
@@ -100,9 +101,13 @@ func countOrSwitchOrWait(client *Client) {
 	defer currentUsingAppKey.mutex.Unlock()
 
 	if currentUsingAppKey.reachingLimit() {
+		fromKey := currentUsingAppKey.AppKey
 		sort.Sort(appKeyCallCountList)
 		currentUsingAppKey = appKeyCallCountList[0]
 		currentUsingAppKey.updateClientKey(client)
+		if Verbose {
+			log.Printf("AppKey switched from %s to %s.", fromKey, currentUsingAppKey.AppKey)
+		}
 	}
 
 	if currentUsingAppKey.reachingLimit() {
@@ -113,6 +118,7 @@ func countOrSwitchOrWait(client *Client) {
 		}
 		time.Sleep(currentUsingAppKey.waitNanoseconds())
 	}
-
+	switched = true
 	currentUsingAppKey.count()
+	return
 }

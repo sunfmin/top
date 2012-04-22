@@ -114,6 +114,7 @@ func (client *Client) RequestNewSessionKey(authcode string) (sessKey string, err
 }
 
 func (req *Request) Execute(r interface{}) (count int64, err error) {
+Retry:
 	count = 0
 	body, err := req.doRequestAndGetBody()
 	if err != nil {
@@ -122,7 +123,11 @@ func (req *Request) Execute(r interface{}) (count int64, err error) {
 	cleanjson, count, err := unwrapjson(body)
 
 	if err != nil {
-		err = detectBanned(err)
+		var switched bool
+		err, switched = switchedKeyIfBanned(err, req.Client)
+		if switched {
+			goto Retry
+		}
 		return
 	}
 
@@ -138,6 +143,7 @@ func (req *Request) Execute(r interface{}) (count int64, err error) {
 }
 
 func (req *Request) ExecuteIntoBranches(rmap map[string]interface{}) (count int64, err error) {
+Retry:
 	body, err := req.doRequestAndGetBody()
 	if err != nil {
 		return
@@ -146,7 +152,11 @@ func (req *Request) ExecuteIntoBranches(rmap map[string]interface{}) (count int6
 	cleanjson, count, err := unwrapjson(body)
 
 	if err != nil {
-		err = detectBanned(err)
+		var switched bool
+		err, switched = switchedKeyIfBanned(err, req.Client)
+		if switched {
+			goto Retry
+		}
 		return
 	}
 
