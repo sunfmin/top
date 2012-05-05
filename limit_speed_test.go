@@ -10,7 +10,7 @@ import (
 func TestLimitSpeed(t *testing.T) {
 	start := time.Now()
 	req := newRequest("taobao.taobaoke.items.get")
-	req.Client.Verbose = true
+	Verbose = true
 
 	ExtandLimitByAddAppKey("12486123", "280a8edc3a899b8a1e4cb965732d2441", 100)
 	for {

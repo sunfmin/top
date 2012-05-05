@@ -186,6 +186,7 @@ func (req *Request) doRequestAndGetBody() (body []byte, err error) {
 	defer resp.Body.Close()
 
 	body, err = ioutil.ReadAll(resp.Body)
+	body = []byte(strings.Replace(string(body), "\r", "", -1))
 	//log.Println(string(body))
 	return
 }
