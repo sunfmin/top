@@ -25,9 +25,11 @@ type Client struct {
 	SessionKey string
 	PartnerId  string
 
-	signMethod string
-	format     string
-	v          string
+	signMethod          string
+	format              string
+	v                   string
+	appKeyCallCountList KeyCallCounts
+	currentUsingAppKey  *appKeyCallCount
 }
 
 type Request struct {
@@ -124,7 +126,7 @@ Retry:
 
 	if err != nil {
 		var switched bool
-		err, switched = switchedKeyIfBanned(err, req.Client)
+		err, switched = req.Client.switchedKeyIfBanned(err)
 		if switched {
 			goto Retry
 		}
@@ -153,7 +155,7 @@ Retry:
 
 	if err != nil {
 		var switched bool
-		err, switched = switchedKeyIfBanned(err, req.Client)
+		err, switched = req.Client.switchedKeyIfBanned(err)
 		if switched {
 			goto Retry
 		}
@@ -172,7 +174,7 @@ Retry:
 }
 
 func (req *Request) doRequestAndGetBody() (body []byte, err error) {
-	countOrSwitchOrWait(req.Client)
+	req.Client.countOrSwitchOrWait()
 	_, query := req.SignatureAndQueryString()
 
 	url := "http://gw.api.taobao.com/router/rest?" + query

@@ -12,7 +12,7 @@ func TestLimitSpeed(t *testing.T) {
 	req := newRequest("taobao.taobaoke.items.get")
 	Verbose = true
 
-	ExtandLimitByAddAppKey("12486123", "280a8edc3a899b8a1e4cb965732d2441", 100)
+	req.Client.ExtandLimitByAddAppKey("12486123", "280a8edc3a899b8a1e4cb965732d2441", 100)
 	for {
 		req.Param("fields", "num_iid")
 		req.Param("keyword", "nike")
@@ -25,7 +25,7 @@ func TestLimitSpeed(t *testing.T) {
 		if err != nil {
 			topErr := err.(*Error)
 			if topErr.BanSeconds() > 0 {
-				panic(fmt.Sprintf("Still banned even limited speed, %+v", currentUsingAppKey))
+				panic(fmt.Sprintf("Still banned even limited speed, %+v", req.Client.currentUsingAppKey))
 			}
 		}
 		if time.Now().Sub(start) > 2*time.Minute {
